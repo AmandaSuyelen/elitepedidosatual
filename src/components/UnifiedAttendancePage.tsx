@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, Package, Scale, ShoppingCart, Calculator, User, DollarSign, Trash2, Minus } from 'lucide-react';
-import { usePDVProducts, usePDVSales, usePDVCart } from '../../hooks/usePDV';
+import { usePDVProducts, usePDVSales, usePDVCart } from "../hooks/usePDV";
 import { usePDVCashRegister } from '../../hooks/usePDVCashRegister';
 import { PDVOperator, PDVProduct } from '../../types/pdv';
 import { PesagemModal } from "../PDV/PesagemModal";
