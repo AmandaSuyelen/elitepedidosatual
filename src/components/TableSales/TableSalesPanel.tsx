@@ -1,29 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { RestaurantTable, TableSale, TableSaleItem, TableCartItem } from '../../types/table-sales';
 import { 
   Users, 
   Plus, 
   Edit3, 
   Trash2, 
-  Search, 
-  DollarSign, 
-  Clock,
-  User,
-  Package,
-  Save,
-  X,
-  Minus,
-  AlertCircle,
+  Save, 
+  X, 
+  ShoppingCart, 
   Calculator,
-  CreditCard,
-  RefreshCw,
-  ShoppingCart,
-  Scale
+  DollarSign,
+  Package,
+  Search,
+  AlertCircle,
+  Clock,
+  CheckCircle,
+  Eye,
+  EyeOff
 } from 'lucide-react';
-import { RestaurantTable, TableSale, TableSaleItem, TableCartItem } from '../../types/table-sales';
 
 interface TableSalesPanelProps {
-  storeId: 1 | 2;
+  storeId: number;
   operatorName?: string;
 }
 
@@ -31,170 +29,28 @@ const TableSalesPanel: React.FC<TableSalesPanelProps> = ({ storeId, operatorName
   const [tables, setTables] = useState<RestaurantTable[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedTable, setSelectedTable] = useState<RestaurantTable | null>(null);
-  const [showSaleModal, setShowSaleModal] = useState(false);
-  const [cartItems, setCartItems] = useState<TableCartItem[]>([]);
-  const [customerName, setCustomerName] = useState('');
-  const [customerCount, setCustomerCount] = useState(1);
-  const [paymentType, setPaymentType] = useState<'dinheiro' | 'pix' | 'cartao_credito' | 'cartao_debito' | 'voucher' | 'misto'>('dinheiro');
-  const [changeAmount, setChangeAmount] = useState(0);
-  const [notes, setNotes] = useState('');
+  const [editingTable, setEditingTable] = useState<RestaurantTable | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [supabaseConfigured, setSupabaseConfigured] = useState(true);
-  const [availableProducts, setAvailableProducts] = useState<any[]>([]);
-  const [productSearchTerm, setProductSearchTerm] = useState('');
-  const [selectedProduct, setSelectedProduct] = useState<any>(null);
-  const [productQuantity, setProductQuantity] = useState(1);
-  const [productWeight, setProductWeight] = useState(0);
-  const [productNotes, setProductNotes] = useState('');
-  const [saleItems, setSaleItems] = useState<TableSaleItem[]>([]);
-
-  // Check Supabase configuration
-  useEffect(() => {
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    
-    const isConfigured = supabaseUrl && supabaseKey && 
-                        supabaseUrl !== 'your_supabase_url_here' && 
-                        supabaseKey !== 'your_supabase_anon_key_here' &&
-                        !supabaseUrl.includes('placeholder');
-    
-    setSupabaseConfigured(isConfigured);
-  }, []);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showInactive, setShowInactive] = useState(false);
 
   const tableName = storeId === 1 ? 'store1_tables' : 'store2_tables';
   const salesTableName = storeId === 1 ? 'store1_table_sales' : 'store2_table_sales';
-  const itemsTableName = storeId === 1 ? 'store1_table_sale_items' : 'store2_table_sale_items';
-  const productsTableName = storeId === 1 ? 'pdv_products' : 'store2_products';
-
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    }).format(price);
-  };
-
-  const fetchProducts = async () => {
-    try {
-      if (!supabaseConfigured) {
-        // Produtos de demonstração
-        const demoProducts = [
-          {
-            id: `demo-acai-300-loja${storeId}`,
-            code: `ACAI300L${storeId}`,
-            name: `Açaí 300ml - Loja ${storeId}`,
-            is_weighable: false,
-            unit_price: 15.90,
-            price_per_gram: null,
-            is_active: true
-          },
-          {
-            id: `demo-acai-500-loja${storeId}`,
-            code: `ACAI500L${storeId}`,
-            name: `Açaí 500ml - Loja ${storeId}`,
-            is_weighable: false,
-            unit_price: 22.90,
-            price_per_gram: null,
-            is_active: true
-          },
-          {
-            id: `demo-acai-1kg-loja${storeId}`,
-            code: `ACAI1KGL${storeId}`,
-            name: `Açaí 1kg - Loja ${storeId}`,
-            is_weighable: true,
-            unit_price: null,
-            price_per_gram: 0.04499,
-            is_active: true
-          }
-        ];
-        setAvailableProducts(demoProducts);
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from(productsTableName)
-        .select('*')
-        .eq('is_active', true)
-        .order('name');
-
-      if (error) throw error;
-      setAvailableProducts(data || []);
-    } catch (err) {
-      console.error(`Erro ao carregar produtos da Loja ${storeId}:`, err);
-      setAvailableProducts([]);
-    }
-  };
-
-  const fetchSaleItems = async (saleId: string) => {
-    try {
-      if (!supabaseConfigured) {
-        setSaleItems([]);
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from(itemsTableName)
-        .select('*')
-        .eq('sale_id', saleId)
-        .order('created_at');
-
-      if (error) throw error;
-      setSaleItems(data || []);
-    } catch (err) {
-      console.error('Erro ao carregar itens da venda:', err);
-      setSaleItems([]);
-    }
-  };
 
   const fetchTables = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      if (!supabaseConfigured) {
-        console.warn(`⚠️ Supabase não configurado - usando dados de demonstração para Loja ${storeId}`);
-        
-        // Dados de demonstração
-        const demoTables: RestaurantTable[] = [
-          {
-            id: 'demo-table-1',
-            number: 1,
-            name: `Mesa 1 - Loja ${storeId}`,
-            capacity: 4,
-            status: 'livre',
-            location: 'Área principal',
-            is_active: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          },
-          {
-            id: 'demo-table-2',
-            number: 2,
-            name: `Mesa 2 - Loja ${storeId}`,
-            capacity: 2,
-            status: 'livre',
-            location: 'Área principal',
-            is_active: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }
-        ];
-        
-        setTables(demoTables);
-        setLoading(false);
-        return;
-      }
-
       console.log(`🔄 Carregando mesas da Loja ${storeId}...`);
-      
+
       const { data, error } = await supabase
         .from(tableName)
         .select(`
           *,
-          current_sale:${salesTableName}!${tableName}_current_sale_id_fkey(*)
+          current_sale:${salesTableName}(*)
         `)
-        .eq('is_active', true)
         .order('number');
 
       if (error) throw error;
@@ -209,191 +65,153 @@ const TableSalesPanel: React.FC<TableSalesPanelProps> = ({ storeId, operatorName
     }
   };
 
-  const openSale = async (table: RestaurantTable) => {
+  const createTable = async (tableData: Omit<RestaurantTable, 'id' | 'created_at' | 'updated_at'>) => {
     try {
-      if (!supabaseConfigured) {
-        alert('Funcionalidade não disponível - Supabase não configurado');
-        return;
-      }
+      console.log(`🚀 Criando mesa na Loja ${storeId}:`, tableData);
 
-      setSaving(true);
-      
-      const { data: sale, error } = await supabase
-        .from(salesTableName)
-        .insert([{
-          table_id: table.id,
-          operator_name: operatorName || 'Operador',
-          customer_name: customerName || 'Cliente',
-          customer_count: customerCount,
-          subtotal: 0,
-          discount_amount: 0,
-          total_amount: 0,
-          change_amount: 0,
-          status: 'aberta',
-          notes: notes,
-          opened_at: new Date().toISOString()
-        }])
+      const { data, error } = await supabase
+        .from(tableName)
+        .insert([tableData])
         .select()
         .single();
 
       if (error) throw error;
 
-      // Atualizar mesa com a venda atual
-      await supabase
-        .from(tableName)
-        .update({
-          status: 'ocupada',
-          current_sale_id: sale.id
-        })
-        .eq('id', table.id);
-
-      await fetchTables();
-      setShowSaleModal(false);
-      resetForm();
+      setTables(prev => [...prev, data]);
+      console.log(`✅ Mesa criada na Loja ${storeId}:`, data);
+      return data;
     } catch (err) {
-      console.error('Erro ao abrir venda:', err);
-      alert('Erro ao abrir venda');
-    } finally {
-      setSaving(false);
+      console.error(`❌ Erro ao criar mesa na Loja ${storeId}:`, err);
+      throw new Error(err instanceof Error ? err.message : 'Erro ao criar mesa');
     }
   };
 
-  const closeSale = async (table: RestaurantTable) => {
-    if (!table.current_sale) return;
-
+  const updateTable = async (id: string, updates: Partial<RestaurantTable>) => {
     try {
-      setSaving(true);
+      console.log(`✏️ Atualizando mesa da Loja ${storeId}:`, id, updates);
 
-      // Fechar venda
-      await supabase
-        .from(salesTableName)
-        .update({
-          status: 'fechada',
-          payment_type: paymentType,
-          change_amount: changeAmount,
-          closed_at: new Date().toISOString()
-        })
-        .eq('id', table.current_sale.id);
-
-      // Liberar mesa
-      await supabase
+      const { data, error } = await supabase
         .from(tableName)
         .update({
-          status: 'livre',
-          current_sale_id: null
+          ...updates,
+          updated_at: new Date().toISOString()
         })
-        .eq('id', table.id);
-
-      await fetchTables();
-      setShowSaleModal(false);
-      resetForm();
-    } catch (err) {
-      console.error('Erro ao fechar venda:', err);
-      alert('Erro ao fechar venda');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const addItemToSale = async (saleId: string, item: TableCartItem) => {
-    try {
-      if (!supabaseConfigured) {
-        alert('Funcionalidade não disponível - Supabase não configurado');
-        return;
-      }
-
-      const { error } = await supabase
-        .from(itemsTableName)
-        .insert([{
-          sale_id: saleId,
-          product_code: item.product_code,
-          product_name: item.product_name,
-          quantity: item.quantity,
-          weight_kg: item.weight,
-          unit_price: item.unit_price,
-          price_per_gram: item.price_per_gram,
-          discount_amount: 0,
-          subtotal: item.subtotal,
-          notes: item.notes
-        }]);
+        .eq('id', id)
+        .select()
+        .single();
 
       if (error) throw error;
 
-      // Recarregar itens da venda
-      await fetchSaleItems(saleId);
-      
-      // Calcular novo subtotal
-      const { data: items, error: itemsError } = await supabase
-        .from(itemsTableName)
-        .select('subtotal')
-        .eq('sale_id', saleId);
-
-      if (itemsError) throw itemsError;
-
-      const newSubtotal = items?.reduce((sum, item) => sum + item.subtotal, 0) || 0;
-
-      await supabase
-        .from(salesTableName)
-        .update({
-          subtotal: newSubtotal,
-          total_amount: newSubtotal
-        })
-        .eq('id', saleId);
-
-      await fetchTables();
+      setTables(prev => prev.map(t => t.id === id ? data : t));
+      console.log(`✅ Mesa atualizada na Loja ${storeId}:`, data);
+      return data;
     } catch (err) {
-      console.error('Erro ao adicionar item:', err);
-      throw err;
+      console.error(`❌ Erro ao atualizar mesa da Loja ${storeId}:`, err);
+      throw new Error(err instanceof Error ? err.message : 'Erro ao atualizar mesa');
     }
   };
 
-  const addProductToCart = () => {
-    if (!selectedProduct) return;
-
-    let subtotal = 0;
-    if (selectedProduct.is_weighable && productWeight > 0) {
-      subtotal = productWeight * (selectedProduct.price_per_gram || 0) * 1000; // peso em kg * preço por grama * 1000
-    } else if (!selectedProduct.is_weighable) {
-      subtotal = productQuantity * (selectedProduct.unit_price || 0);
-    }
-
-    const newItem: TableCartItem = {
-      product_code: selectedProduct.code,
-      product_name: selectedProduct.name,
-      quantity: productQuantity,
-      weight: selectedProduct.is_weighable ? productWeight : undefined,
-      unit_price: selectedProduct.is_weighable ? undefined : selectedProduct.unit_price,
-      price_per_gram: selectedProduct.is_weighable ? selectedProduct.price_per_gram : undefined,
-      subtotal: subtotal,
-      notes: productNotes
-    };
-
-    setCartItems(prev => [...prev, newItem]);
-    
-    // Reset form
-    setSelectedProduct(null);
-    setProductQuantity(1);
-    setProductWeight(0);
-    setProductNotes('');
-    setProductSearchTerm('');
-  };
-
-  const removeFromCart = (index: number) => {
-    setCartItems(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const saveCartItems = async () => {
-    if (!selectedTable?.current_sale || cartItems.length === 0) return;
-
+  const deleteTable = async (id: string) => {
     try {
-      setSaving(true);
-      
-      for (const item of cartItems) {
-        await addItemToSale(selectedTable.current_sale.id, item);
+      console.log(`🗑️ Excluindo mesa da Loja ${storeId}:`, id);
+
+      // Verificar se a mesa tem venda ativa
+      const table = tables.find(t => t.id === id);
+      if (table?.current_sale_id) {
+        throw new Error('Não é possível excluir uma mesa com venda ativa. Finalize a venda primeiro.');
+      }
+
+      const { error } = await supabase
+        .from(tableName)
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setTables(prev => prev.filter(t => t.id !== id));
+      console.log(`✅ Mesa excluída da Loja ${storeId}`);
+    } catch (err) {
+      console.error(`❌ Erro ao excluir mesa da Loja ${storeId}:`, err);
+      throw new Error(err instanceof Error ? err.message : 'Erro ao excluir mesa');
+    }
+  };
+
+  const toggleTableActive = async (table: RestaurantTable) => {
+    try {
+      await updateTable(table.id, { is_active: !table.is_active });
+    } catch (error) {
+      console.error('Erro ao alterar status da mesa:', error);
+      alert('Erro ao alterar status da mesa');
+    }
+  };
+
+  const filteredTables = tables.filter(table => {
+    const matchesSearch = searchTerm === '' || 
+      table.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      table.number.toString().includes(searchTerm) ||
+      (table.location && table.location.toLowerCase().includes(searchTerm.toLowerCase()));
+    
+    const matchesActiveFilter = showInactive || table.is_active;
+    
+    return matchesSearch && matchesActiveFilter;
+  });
+
+  const handleCreate = () => {
+    // Encontrar o próximo número disponível
+    const existingNumbers = tables.map(t => t.number).sort((a, b) => a - b);
+    let nextNumber = 1;
+    for (const num of existingNumbers) {
+      if (num === nextNumber) {
+        nextNumber++;
+      } else {
+        break;
+      }
+    }
+
+    setEditingTable({
+      id: '',
+      number: nextNumber,
+      name: `Mesa ${nextNumber}`,
+      capacity: 4,
+      status: 'livre',
+      current_sale_id: null,
+      location: '',
+      is_active: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    });
+    setIsCreating(true);
+  };
+
+  const handleSave = async () => {
+    if (!editingTable) return;
+
+    if (!editingTable.name.trim() || editingTable.number <= 0) {
+      alert('Nome e número da mesa são obrigatórios');
+      return;
+    }
+
+    // Verificar se o número já existe
+    const existingTable = tables.find(t => 
+      t.number === editingTable.number && t.id !== editingTable.id
+    );
+    if (existingTable) {
+      alert('Número da mesa já existe. Use um número diferente.');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      if (isCreating) {
+        const { id, created_at, updated_at, current_sale, ...tableData } = editingTable;
+        await createTable(tableData);
+      } else {
+        const { current_sale, ...tableData } = editingTable;
+        await updateTable(editingTable.id, tableData);
       }
       
-      setCartItems([]);
-      await fetchSaleItems(selectedTable.current_sale.id);
+      setEditingTable(null);
+      setIsCreating(false);
       
       // Mostrar feedback de sucesso
       const successMessage = document.createElement('div');
@@ -402,7 +220,7 @@ const TableSalesPanel: React.FC<TableSalesPanelProps> = ({ storeId, operatorName
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
         </svg>
-        Itens adicionados à venda com sucesso!
+        Mesa ${isCreating ? 'criada' : 'atualizada'} com sucesso!
       `;
       document.body.appendChild(successMessage);
       
@@ -411,60 +229,54 @@ const TableSalesPanel: React.FC<TableSalesPanelProps> = ({ storeId, operatorName
           document.body.removeChild(successMessage);
         }
       }, 3000);
-    } catch (err) {
-      console.error('Erro ao salvar itens:', err);
-      alert('Erro ao adicionar itens à venda');
+    } catch (error) {
+      console.error('Erro ao salvar mesa:', error);
+      alert(`Erro ao salvar mesa: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
     } finally {
       setSaving(false);
     }
   };
 
-  const resetForm = () => {
-    setCustomerName('');
-    setCustomerCount(1);
-    setPaymentType('dinheiro');
-    setChangeAmount(0);
-    setNotes('');
-    setCartItems([]);
-    setSaleItems([]);
-    setSelectedTable(null);
-    setSelectedProduct(null);
-    setProductQuantity(1);
-    setProductWeight(0);
-    setProductNotes('');
-    setProductSearchTerm('');
-  };
-
-  const handleOpenSaleModal = (table: RestaurantTable) => {
-    setSelectedTable(table);
-    setShowSaleModal(true);
-    fetchProducts();
-    
-    if (table.current_sale) {
-      setCustomerName(table.current_sale.customer_name || '');
-      setCustomerCount(table.current_sale.customer_count || 1);
-      setNotes(table.current_sale.notes || '');
-      fetchSaleItems(table.current_sale.id);
+  const handleDelete = async (id: string, name: string) => {
+    if (confirm(`Tem certeza que deseja excluir a mesa "${name}"?`)) {
+      try {
+        await deleteTable(id);
+        
+        // Mostrar feedback de sucesso
+        const successMessage = document.createElement('div');
+        successMessage.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center gap-2';
+        successMessage.innerHTML = `
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+          </svg>
+          Mesa excluída com sucesso!
+        `;
+        document.body.appendChild(successMessage);
+        
+        setTimeout(() => {
+          if (document.body.contains(successMessage)) {
+            document.body.removeChild(successMessage);
+          }
+        }, 3000);
+      } catch (error) {
+        console.error('Erro ao excluir mesa:', error);
+        alert(`Erro ao excluir mesa: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+      }
     }
   };
-
-  const filteredTables = tables.filter(table =>
-    table.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    table.number.toString().includes(searchTerm)
-  );
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'livre':
-        return 'bg-green-100 text-green-800';
+        return 'bg-green-100 text-green-800 border-green-200';
       case 'ocupada':
-        return 'bg-red-100 text-red-800';
+        return 'bg-red-100 text-red-800 border-red-200';
       case 'aguardando_conta':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       case 'limpeza':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-blue-100 text-blue-800 border-blue-200';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
@@ -487,21 +299,6 @@ const TableSalesPanel: React.FC<TableSalesPanelProps> = ({ storeId, operatorName
     fetchTables();
   }, [storeId]);
 
-  const filteredProducts = availableProducts.filter(product =>
-    product.name.toLowerCase().includes(productSearchTerm.toLowerCase()) ||
-    product.code.toLowerCase().includes(productSearchTerm.toLowerCase())
-  );
-
-  const getCartTotal = () => {
-    return cartItems.reduce((sum, item) => sum + item.subtotal, 0);
-  };
-
-  const getSaleTotal = () => {
-    const itemsTotal = saleItems.reduce((sum, item) => sum + item.subtotal, 0);
-    const cartTotal = getCartTotal();
-    return itemsTotal + cartTotal;
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -513,39 +310,21 @@ const TableSalesPanel: React.FC<TableSalesPanelProps> = ({ storeId, operatorName
 
   return (
     <div className="space-y-6">
-      {/* Supabase Configuration Warning */}
-      {!supabaseConfigured && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
-          <div className="flex items-center gap-3">
-            <div className="bg-yellow-100 rounded-full p-2">
-              <AlertCircle size={20} className="text-yellow-600" />
-            </div>
-            <div>
-              <h3 className="font-medium text-yellow-800">Modo Demonstração - Loja {storeId}</h3>
-              <p className="text-yellow-700 text-sm">
-                Supabase não configurado. Funcionalidades limitadas.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
             <Users size={24} className="text-indigo-600" />
-            Vendas de Mesas - Loja {storeId}
+            Gerenciar Mesas - Loja {storeId}
           </h2>
-          <p className="text-gray-600">Gerencie vendas presenciais por mesa</p>
+          <p className="text-gray-600">Configure e gerencie as mesas da loja</p>
         </div>
         <button
-          onClick={fetchTables}
-          disabled={loading}
-          className="bg-blue-500 hover:bg-blue-600 disabled:bg-blue-300 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+          onClick={handleCreate}
+          className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
         >
-          <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-          Atualizar
+          <Plus size={20} />
+          Nova Mesa
         </button>
       </div>
 
@@ -555,17 +334,35 @@ const TableSalesPanel: React.FC<TableSalesPanelProps> = ({ storeId, operatorName
         </div>
       )}
 
-      {/* Search */}
+      {/* Search and Filters */}
       <div className="bg-white rounded-xl shadow-sm p-4">
-        <div className="relative">
-          <Search size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Buscar mesas..."
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
+        <div className="flex flex-col lg:flex-row gap-4">
+          <div className="flex-1">
+            <div className="relative">
+              <Search size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Buscar mesas por número, nome ou localização..."
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={showInactive}
+                onChange={(e) => setShowInactive(e.target.checked)}
+                className="w-4 h-4 text-indigo-600"
+              />
+              <span className="text-sm font-medium text-gray-700">
+                Mostrar mesas inativas
+              </span>
+            </label>
+          </div>
         </div>
       </div>
 
@@ -574,144 +371,134 @@ const TableSalesPanel: React.FC<TableSalesPanelProps> = ({ storeId, operatorName
         {filteredTables.map((table) => (
           <div
             key={table.id}
-            className="bg-white rounded-xl shadow-sm border-2 border-gray-200 hover:border-indigo-300 transition-all duration-200 overflow-hidden"
+            className={`bg-white rounded-xl shadow-sm border-2 p-6 transition-all hover:shadow-md ${
+              !table.is_active ? 'opacity-60' : ''
+            } ${getStatusColor(table.status)}`}
           >
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="bg-indigo-100 rounded-full p-2">
-                    <Users size={20} className="text-indigo-600" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-800">{table.name}</h3>
-                    <p className="text-sm text-gray-600">Mesa {table.number}</p>
-                  </div>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="bg-white rounded-full p-2">
+                  <Users size={20} className="text-indigo-600" />
                 </div>
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(table.status)}`}>
+                <div>
+                  <h3 className="font-bold text-lg text-gray-800">
+                    Mesa {table.number}
+                  </h3>
+                  <p className="text-sm text-gray-600">{table.name}</p>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setEditingTable(table)}
+                  className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
+                  title="Editar mesa"
+                >
+                  <Edit3 size={16} />
+                </button>
+                <button
+                  onClick={() => handleDelete(table.id, table.name)}
+                  disabled={table.current_sale_id !== null}
+                  className={`p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors ${
+                    table.current_sale_id ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                  title={table.current_sale_id ? 'Não é possível excluir mesa com venda ativa' : 'Excluir mesa'}
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Capacidade:</span>
+                <span className="font-medium">{table.capacity} pessoas</span>
+              </div>
+
+              {table.location && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">Localização:</span>
+                  <span className="font-medium text-sm">{table.location}</span>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Status:</span>
+                <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(table.status)}`}>
                   {getStatusLabel(table.status)}
                 </span>
               </div>
 
-              <div className="space-y-2 mb-4">
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <User size={14} />
-                  <span>Capacidade: {table.capacity} pessoas</span>
-                </div>
-                {table.location && (
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <Package size={14} />
-                    <span>{table.location}</span>
-                  </div>
-                )}
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Ativa:</span>
+                <button
+                  onClick={() => toggleTableActive(table)}
+                  className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-colors ${
+                    table.is_active
+                      ? 'bg-green-100 text-green-800 hover:bg-green-200'
+                      : 'bg-red-100 text-red-800 hover:bg-red-200'
+                  }`}
+                >
+                  {table.is_active ? (
+                    <>
+                      <Eye size={12} />
+                      Ativa
+                    </>
+                  ) : (
+                    <>
+                      <EyeOff size={12} />
+                      Inativa
+                    </>
+                  )}
+                </button>
               </div>
 
-              {table.current_sale && (
-                <div className="bg-gray-50 rounded-lg p-3 mb-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <DollarSign size={16} className="text-green-600" />
-                    <span className="font-medium text-gray-800">Venda Ativa</span>
+              {table.current_sale_id && (
+                <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <ShoppingCart size={16} className="text-yellow-600" />
+                    <span className="text-sm font-medium text-yellow-800">
+                      Venda Ativa
+                    </span>
                   </div>
-                  <div className="space-y-1 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Cliente:</span>
-                      <span className="font-medium">{table.current_sale.customer_name}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Total:</span>
-                      <span className="font-bold text-green-600">
-                        {formatPrice(table.current_sale.total_amount)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Aberta:</span>
-                      <span className="text-gray-500">
-                        {new Date(table.current_sale.opened_at).toLocaleTimeString('pt-BR')}
-                      </span>
-                    </div>
-                  </div>
+                  <p className="text-xs text-yellow-700 mt-1">
+                    Esta mesa possui uma venda em andamento
+                  </p>
                 </div>
               )}
-
-              <div className="space-y-2">
-                {table.status === 'livre' ? (
-                  <button
-                    onClick={() => handleOpenSaleModal(table)}
-                    disabled={!supabaseConfigured}
-                    className="w-full bg-green-500 hover:bg-green-600 disabled:bg-gray-300 text-white py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
-                  >
-                    <Plus size={16} />
-                    Abrir Mesa
-                  </button>
-                ) : table.status === 'ocupada' ? (
-                  <div className="space-y-2">
-                    <button
-                      onClick={() => handleOpenSaleModal(table)}
-                      className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
-                    >
-                      <Edit3 size={16} />
-                      Gerenciar Venda
-                    </button>
-                    <button
-                      onClick={() => {
-                        setSelectedTable(table);
-                        setPaymentType('dinheiro');
-                        setChangeAmount(0);
-                        setShowSaleModal(true);
-                      }}
-                      className="w-full bg-orange-500 hover:bg-orange-600 text-white py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
-                    >
-                      <DollarSign size={16} />
-                      Fechar Conta
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => {
-                      // Liberar mesa
-                      if (supabaseConfigured) {
-                        supabase
-                          .from(tableName)
-                          .update({ status: 'livre' })
-                          .eq('id', table.id)
-                          .then(() => fetchTables());
-                      }
-                    }}
-                    disabled={!supabaseConfigured}
-                    className="w-full bg-gray-500 hover:bg-gray-600 disabled:bg-gray-300 text-white py-2 px-4 rounded-lg font-medium transition-colors"
-                  >
-                    Liberar Mesa
-                  </button>
-                )}
-              </div>
             </div>
           </div>
         ))}
       </div>
 
       {filteredTables.length === 0 && (
-        <div className="text-center py-12">
+        <div className="bg-white rounded-xl shadow-sm p-12 text-center">
           <Users size={48} className="mx-auto text-gray-300 mb-4" />
+          <h3 className="text-lg font-medium text-gray-600 mb-2">
+            Nenhuma mesa encontrada
+          </h3>
           <p className="text-gray-500">
-            {searchTerm ? 'Nenhuma mesa encontrada' : `Nenhuma mesa cadastrada na Loja ${storeId}`}
+            {searchTerm || !showInactive 
+              ? 'Tente ajustar os filtros de busca'
+              : `Nenhuma mesa cadastrada na Loja ${storeId}`
+            }
           </p>
         </div>
       )}
 
-      {/* Sale Modal - ALTURA CORRIGIDA */}
-      {showSaleModal && selectedTable && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-2xl shadow-xl overflow-hidden flex flex-col" style={{ maxHeight: '90vh' }}>
-            {/* Header - Fixo */}
-            <div className="p-6 border-b border-gray-200 flex-shrink-0">
+      {/* Edit/Create Modal */}
+      {editingTable && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-200">
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
-                  <Calculator size={24} className="text-indigo-600" />
-                  {selectedTable.current_sale ? 'Gerenciar Venda' : 'Abrir Mesa'} - {selectedTable.name}
+                <h2 className="text-xl font-semibold text-gray-800">
+                  {isCreating ? `Nova Mesa - Loja ${storeId}` : 'Editar Mesa'}
                 </h2>
                 <button
                   onClick={() => {
-                    setShowSaleModal(false);
-                    resetForm();
+                    setEditingTable(null);
+                    setIsCreating(false);
                   }}
                   className="p-2 hover:bg-gray-100 rounded-full transition-colors"
                 >
@@ -720,436 +507,202 @@ const TableSalesPanel: React.FC<TableSalesPanelProps> = ({ storeId, operatorName
               </div>
             </div>
 
-            {/* Content - Scrollável */}
-            <div className="flex-1 overflow-y-auto p-6">
-              <div className="space-y-6">
-                {/* Informações da Mesa */}
-                <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
-                  <h3 className="font-medium text-indigo-800 mb-2">Informações da Mesa</h3>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="text-indigo-600">Número:</span>
-                      <span className="ml-2 font-medium">{selectedTable.number}</span>
-                    </div>
-                    <div>
-                      <span className="text-indigo-600">Capacidade:</span>
-                      <span className="ml-2 font-medium">{selectedTable.capacity} pessoas</span>
-                    </div>
-                    <div>
-                      <span className="text-indigo-600">Status:</span>
-                      <span className={`ml-2 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(selectedTable.status)}`}>
-                        {getStatusLabel(selectedTable.status)}
-                      </span>
-                    </div>
-                    {selectedTable.location && (
-                      <div>
-                        <span className="text-indigo-600">Local:</span>
-                        <span className="ml-2 font-medium">{selectedTable.location}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
+            <div className="p-6 space-y-4">
+              {/* Número da Mesa */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Número da Mesa *
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={editingTable.number}
+                  onChange={(e) => setEditingTable({
+                    ...editingTable,
+                    number: parseInt(e.target.value) || 1
+                  })}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="Ex: 1"
+                />
+              </div>
 
-                {/* Dados do Cliente */}
-                <div className="space-y-4">
-                  <h3 className="font-medium text-gray-800">Dados do Cliente</h3>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Nome do Cliente
-                      </label>
-                      <input
-                        type="text"
-                        value={customerName}
-                        onChange={(e) => setCustomerName(e.target.value)}
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                        placeholder="Nome do cliente"
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Número de Pessoas
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        max={selectedTable.capacity}
-                        value={customerCount}
-                        onChange={(e) => setCustomerCount(parseInt(e.target.value) || 1)}
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      />
-                    </div>
-                  </div>
-                </div>
+              {/* Nome da Mesa */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Nome da Mesa *
+                </label>
+                <input
+                  type="text"
+                  value={editingTable.name}
+                  onChange={(e) => setEditingTable({
+                    ...editingTable,
+                    name: e.target.value
+                  })}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="Ex: Mesa 1"
+                />
+              </div>
 
-                {/* Produtos - Apenas para vendas ativas */}
-                {selectedTable.current_sale && (
-                  <div className="space-y-4">
-                    <h3 className="font-medium text-gray-800 flex items-center gap-2">
-                      <ShoppingCart size={20} className="text-green-600" />
-                      Produtos
-                    </h3>
-                    
-                    {/* Buscar Produtos */}
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <div className="relative mb-3">
-                        <Search size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                        <input
-                          type="text"
-                          value={productSearchTerm}
-                          onChange={(e) => setProductSearchTerm(e.target.value)}
-                          placeholder="Buscar produtos..."
-                          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                        />
-                      </div>
-                      
-                      {productSearchTerm && filteredProducts.length > 0 && (
-                        <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg mb-3">
-                          {filteredProducts.slice(0, 5).map(product => (
-                            <div 
-                              key={product.id}
-                              className="p-2 hover:bg-gray-100 cursor-pointer border-b border-gray-200 last:border-b-0"
-                              onClick={() => {
-                                setSelectedProduct(product);
-                                setProductSearchTerm('');
-                              }}
-                            >
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <div className="font-medium text-sm">{product.name}</div>
-                                  <div className="text-xs text-gray-500">{product.code}</div>
-                                </div>
-                                <div className="text-sm font-medium text-green-600">
-                                  {product.is_weighable ? 
-                                    `${formatPrice((product.price_per_gram || 0) * 1000)}/kg` :
-                                    formatPrice(product.unit_price || 0)
-                                  }
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      
-                      {selectedProduct && (
-                        <div className="bg-white p-3 rounded-lg border border-gray-200 mb-3">
-                          <div className="flex justify-between items-start mb-2">
-                            <div className="flex-1">
-                              <div className="font-medium text-gray-800">{selectedProduct.name}</div>
-                              <div className="text-sm text-gray-500">{selectedProduct.code}</div>
-                              <div className="text-sm font-medium text-green-600">
-                                {selectedProduct.is_weighable ? 
-                                  `${formatPrice((selectedProduct.price_per_gram || 0) * 1000)}/kg` :
-                                  formatPrice(selectedProduct.unit_price || 0)
-                                }
-                              </div>
-                            </div>
-                            <button
-                              onClick={() => setSelectedProduct(null)}
-                              className="text-gray-400 hover:text-gray-600"
-                            >
-                              <X size={16} />
-                            </button>
-                          </div>
-                          
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {selectedProduct.is_weighable ? (
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                  Peso (kg)
-                                </label>
-                                <div className="relative">
-                                  <Scale size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                                  <input
-                                    type="number"
-                                    step="0.001"
-                                    min="0"
-                                    value={productWeight}
-                                    onChange={(e) => setProductWeight(parseFloat(e.target.value) || 0)}
-                                    className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                                    placeholder="0.000"
-                                  />
-                                </div>
-                              </div>
-                            ) : (
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                  Quantidade
-                                </label>
-                                <input
-                                  type="number"
-                                  min="1"
-                                  value={productQuantity}
-                                  onChange={(e) => setProductQuantity(parseInt(e.target.value) || 1)}
-                                  className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                                />
-                              </div>
-                            )}
-                            
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Observações
-                              </label>
-                              <input
-                                type="text"
-                                value={productNotes}
-                                onChange={(e) => setProductNotes(e.target.value)}
-                                className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                                placeholder="Observações do item"
-                              />
-                            </div>
-                          </div>
-                          
-                          <div className="mt-3 flex justify-between items-center">
-                            <div className="text-sm text-gray-600">
-                              Subtotal: <span className="font-bold text-green-600">
-                                {formatPrice(
-                                  selectedProduct.is_weighable ? 
-                                    productWeight * (selectedProduct.price_per_gram || 0) * 1000 :
-                                    productQuantity * (selectedProduct.unit_price || 0)
-                                )}
-                              </span>
-                            </div>
-                            <button
-                              onClick={addProductToCart}
-                              disabled={selectedProduct.is_weighable ? productWeight <= 0 : productQuantity <= 0}
-                              className="bg-green-500 hover:bg-green-600 disabled:bg-gray-300 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-                            >
-                              Adicionar
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
+              {/* Capacidade */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Capacidade (pessoas)
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="20"
+                  value={editingTable.capacity}
+                  onChange={(e) => setEditingTable({
+                    ...editingTable,
+                    capacity: parseInt(e.target.value) || 4
+                  })}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="4"
+                />
+              </div>
 
-                    {/* Carrinho de Produtos */}
-                    {cartItems.length > 0 && (
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                        <h4 className="font-medium text-blue-800 mb-3">Itens a Adicionar ({cartItems.length})</h4>
-                        <div className="space-y-2 max-h-32 overflow-y-auto">
-                          {cartItems.map((item, index) => (
-                            <div key={index} className="bg-white p-2 rounded border flex justify-between items-center">
-                              <div className="flex-1">
-                                <div className="font-medium text-sm">{item.product_name}</div>
-                                <div className="text-xs text-gray-500">
-                                  {item.weight ? `${item.weight}kg` : `${item.quantity}x`}
-                                  {item.notes && ` - ${item.notes}`}
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold text-green-600 text-sm">
-                                  {formatPrice(item.subtotal)}
-                                </span>
-                                <button
-                                  onClick={() => removeFromCart(index)}
-                                  className="text-red-500 hover:text-red-700"
-                                >
-                                  <Trash2 size={14} />
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                        <div className="mt-3 pt-3 border-t border-blue-200 flex justify-between items-center">
-                          <span className="font-medium text-blue-800">Total do Carrinho:</span>
-                          <span className="font-bold text-blue-800">{formatPrice(getCartTotal())}</span>
-                        </div>
-                        <button
-                          onClick={saveCartItems}
-                          disabled={saving}
-                          className="w-full mt-3 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 text-white py-2 rounded-lg font-medium transition-colors"
-                        >
-                          {saving ? 'Salvando...' : 'Salvar Itens na Venda'}
-                        </button>
-                      </div>
-                    )}
+              {/* Localização */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Localização (opcional)
+                </label>
+                <input
+                  type="text"
+                  value={editingTable.location || ''}
+                  onChange={(e) => setEditingTable({
+                    ...editingTable,
+                    location: e.target.value
+                  })}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="Ex: Área externa, Salão principal"
+                />
+              </div>
 
-                    {/* Itens da Venda Atual */}
-                    {saleItems.length > 0 && (
-                      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                        <h4 className="font-medium text-green-800 mb-3">Itens da Venda ({saleItems.length})</h4>
-                        <div className="space-y-2 max-h-40 overflow-y-auto">
-                          {saleItems.map((item) => (
-                            <div key={item.id} className="bg-white p-2 rounded border">
-                              <div className="flex justify-between items-center">
-                                <div className="flex-1">
-                                  <div className="font-medium text-sm">{item.product_name}</div>
-                                  <div className="text-xs text-gray-500">
-                                    {item.weight_kg ? `${item.weight_kg}kg` : `${item.quantity}x`}
-                                    {item.notes && ` - ${item.notes}`}
-                                  </div>
-                                </div>
-                                <span className="font-bold text-green-600 text-sm">
-                                  {formatPrice(item.subtotal)}
-                                </span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                        <div className="mt-3 pt-3 border-t border-green-200 flex justify-between items-center">
-                          <span className="font-medium text-green-800">Total dos Itens:</span>
-                          <span className="font-bold text-green-800">
-                            {formatPrice(saleItems.reduce((sum, item) => sum + item.subtotal, 0))}
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
+              {/* Status */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Status Inicial
+                </label>
+                <select
+                  value={editingTable.status}
+                  onChange={(e) => setEditingTable({
+                    ...editingTable,
+                    status: e.target.value as any
+                  })}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="livre">Livre</option>
+                  <option value="ocupada">Ocupada</option>
+                  <option value="aguardando_conta">Aguardando Conta</option>
+                  <option value="limpeza">Limpeza</option>
+                </select>
+              </div>
 
-                {/* Forma de Pagamento (apenas para fechar conta) */}
-                {selectedTable.current_sale && (
-                  <div className="space-y-4">
-                    <h3 className="font-medium text-gray-800">Pagamento</h3>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Forma de Pagamento
-                      </label>
-                      <select
-                        value={paymentType}
-                        onChange={(e) => setPaymentType(e.target.value as any)}
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      >
-                        <option value="dinheiro">Dinheiro</option>
-                        <option value="pix">PIX</option>
-                        <option value="cartao_credito">Cartão de Crédito</option>
-                        <option value="cartao_debito">Cartão de Débito</option>
-                        <option value="voucher">Voucher</option>
-                        <option value="misto">Pagamento Misto</option>
-                      </select>
-                    </div>
-
-                    {paymentType === 'dinheiro' && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Troco para quanto?
-                        </label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={changeAmount}
-                          onChange={(e) => setChangeAmount(parseFloat(e.target.value) || 0)}
-                          className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                          placeholder="Valor para troco"
-                        />
-                      </div>
-                    )}
-
-                    {/* Resumo da Venda */}
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                      <h4 className="font-medium text-green-800 mb-2">Resumo da Venda</h4>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-green-600">Itens salvos:</span>
-                          <span className="font-medium">{formatPrice(saleItems.reduce((sum, item) => sum + item.subtotal, 0))}</span>
-                        </div>
-                        {cartItems.length > 0 && (
-                          <div className="flex justify-between">
-                            <span className="text-blue-600">Itens no carrinho:</span>
-                            <span className="font-medium text-blue-600">{formatPrice(getCartTotal())}</span>
-                          </div>
-                        )}
-                        <div className="flex justify-between">
-                          <span className="text-green-600">Subtotal:</span>
-                          <span className="font-medium">{formatPrice(getSaleTotal())}</span>
-                        </div>
-                        {selectedTable.current_sale.discount_amount > 0 && (
-                          <div className="flex justify-between">
-                            <span className="text-green-600">Desconto:</span>
-                            <span className="font-medium text-red-600">-{formatPrice(selectedTable.current_sale.discount_amount)}</span>
-                          </div>
-                        )}
-                        <div className="flex justify-between font-bold text-lg pt-2 border-t border-green-200">
-                          <span className="text-green-800">Total:</span>
-                          <span className="text-green-800">{formatPrice(getSaleTotal() - selectedTable.current_sale.discount_amount)}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Observações */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Observações
-                  </label>
-                  <textarea
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    className="w-full p-3 border border-gray-300 rounded-lg resize-none h-20 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    placeholder="Observações sobre a mesa ou venda..."
+              {/* Mesa Ativa */}
+              <div>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={editingTable.is_active}
+                    onChange={(e) => setEditingTable({
+                      ...editingTable,
+                      is_active: e.target.checked
+                    })}
+                    className="w-4 h-4 text-indigo-600"
                   />
-                </div>
+                  <span className="text-sm font-medium text-gray-700">
+                    Mesa ativa (disponível para uso)
+                  </span>
+                </label>
               </div>
             </div>
 
-            {/* Footer - Fixo na parte inferior */}
-            <div className="p-6 border-t border-gray-200 bg-gray-50 flex-shrink-0">
-              <div className="flex justify-end gap-3">
-                <button
-                  onClick={() => {
-                    setShowSaleModal(false);
-                    resetForm();
-                  }}
-                  className="px-6 py-3 text-gray-700 bg-white hover:bg-gray-50 border border-gray-300 rounded-lg font-medium transition-colors"
-                >
-                  Cancelar
-                </button>
-                
-                {selectedTable.current_sale ? (
-                  <button
-                    onClick={() => closeSale(selectedTable)}
-                    disabled={saving || !supabaseConfigured}
-                    className="px-6 py-3 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
-                  >
-                    {saving ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        Processando...
-                      </>
-                    ) : (
-                      <>
-                        <CreditCard size={16} />
-                        Fechar Conta
-                      </>
-                    )}
-                  </button>
+            <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setEditingTable(null);
+                  setIsCreating(false);
+                }}
+                className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saving || !editingTable.name.trim() || editingTable.number <= 0}
+                className="px-4 py-2 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 text-white rounded-lg transition-colors flex items-center gap-2"
+              >
+                {saving ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Salvando...
+                  </>
                 ) : (
-                  <button
-                    onClick={() => openSale(selectedTable)}
-                    disabled={saving || !customerName.trim() || !supabaseConfigured}
-                    className="px-6 py-3 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
-                  >
-                    {saving ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        Salvando...
-                      </>
-                    ) : (
-                      <>
-                        <Save size={16} />
-                        Abrir Mesa
-                      </>
-                    )}
-                  </button>
+                  <>
+                    <Save size={16} />
+                    {isCreating ? 'Criar Mesa' : 'Salvar Alterações'}
+                  </>
                 )}
-              </div>
-              
-              {!supabaseConfigured && (
-                <div className="mt-3 text-center">
-                  <p className="text-sm text-red-600">
-                    ⚠️ Funcionalidade não disponível - Supabase não configurado
-                  </p>
-                </div>
-              )}
+              </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Informações sobre Mesas */}
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+        <div className="flex items-start gap-3">
+          <AlertCircle size={20} className="text-blue-600 mt-0.5" />
+          <div>
+            <h4 className="font-medium text-blue-800 mb-2">ℹ️ Informações sobre Mesas</h4>
+            <ul className="text-sm text-blue-700 space-y-1">
+              <li>• As mesas são salvas na tabela <code>{tableName}</code></li>
+              <li>• Cada mesa pode ter uma venda ativa associada</li>
+              <li>• Mesas inativas não aparecem no sistema de vendas</li>
+              <li>• Não é possível excluir mesas com vendas ativas</li>
+              <li>• O status da mesa é atualizado automaticamente durante as vendas</li>
+              <li>• A capacidade ajuda a organizar o atendimento</li>
+              <li>• A localização facilita a identificação das mesas</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      {/* Estatísticas das Mesas */}
+      <div className="bg-white rounded-xl shadow-sm p-6">
+        <h3 className="text-lg font-semibold text-gray-800 mb-4">Estatísticas das Mesas - Loja {storeId}</h3>
+        
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="text-center">
+            <p className="text-2xl font-bold text-indigo-600">
+              {tables.filter(t => t.is_active).length}
+            </p>
+            <p className="text-gray-600">Mesas Ativas</p>
+          </div>
+          
+          <div className="text-center">
+            <p className="text-2xl font-bold text-green-600">
+              {tables.filter(t => t.status === 'livre' && t.is_active).length}
+            </p>
+            <p className="text-gray-600">Mesas Livres</p>
+          </div>
+          
+          <div className="text-center">
+            <p className="text-2xl font-bold text-red-600">
+              {tables.filter(t => t.status === 'ocupada').length}
+            </p>
+            <p className="text-gray-600">Mesas Ocupadas</p>
+          </div>
+          
+          <div className="text-center">
+            <p className="text-2xl font-bold text-blue-600">
+              {tables.reduce((sum, t) => sum + (t.capacity || 0), 0)}
+            </p>
+            <p className="text-gray-600">Capacidade Total</p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

@@ -1,20 +1,20 @@
-import React, { useState } from 'react';
-import { Plus, Search, Package, Scale, ShoppingCart, Trash2, Minus } from 'lucide-react';
-import { useStore2Products } from '../../hooks/useStore2Products';
-import { useStore2Sales, useStore2Cart } from '../../hooks/useStore2Sales';
-import { useStore2PDVCashRegister } from '../../hooks/useStore2PDVCashRegister';
-import { PDVOperator } from '../../types/pdv';
-import { PesagemModal } from '../PDV/PesagemModal';
+import React, { useState, useEffect } from 'react';
+import { Plus, Search, Package, Scale, ShoppingCart, Calculator, User, DollarSign, Trash2, Minus } from 'lucide-react';
+import { usePDVProducts, usePDVSales, usePDVCart } from '../../hooks/usePDV';
+import { usePDVCashRegister } from '../../hooks/usePDVCashRegister';
+import { PDVOperator, PDVProduct } from '../../types/pdv';
+import { PesagemModal } from './PesagemModal';
 
-interface Store2PDVSalesScreenProps {
+interface PDVSalesScreenProps {
   operator?: PDVOperator;
   scaleHook?: any;
+  storeSettings?: any;
 }
 
-const Store2PDVSalesScreen: React.FC<Store2PDVSalesScreenProps> = ({ operator, scaleHook }) => {
-  const { products, loading: productsLoading, searchProducts } = useStore2Products();
-  const { createSale, loading: salesLoading } = useStore2Sales();
-  const { isOpen: isCashRegisterOpen, currentRegister } = useStore2PDVCashRegister();
+const PDVSalesScreen: React.FC<PDVSalesScreenProps> = ({ operator, scaleHook, storeSettings }) => {
+  const { products, loading: productsLoading, searchProducts } = usePDVProducts();
+  const { createSale, loading: salesLoading } = usePDVSales();
+  const { isOpen: isCashRegisterOpen, currentRegister } = usePDVCashRegister();
   const {
     items,
     discount,
@@ -30,12 +30,13 @@ const Store2PDVSalesScreen: React.FC<Store2PDVSalesScreenProps> = ({ operator, s
     getTotal,
     itemCount,
     totalItems
-  } = useStore2Cart();
+  } = usePDVCart();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [showWeightModal, setShowWeightModal] = useState(false);
-  const [selectedWeighableProduct, setSelectedWeighableProduct] = useState<any>(null);
+  const [selectedWeighableProduct, setSelectedWeighableProduct] = useState<PDVProduct | null>(null);
+  const [showCart, setShowCart] = useState(false);
 
   const categories = [
     { id: 'all', label: 'Todos' },
@@ -64,12 +65,13 @@ const Store2PDVSalesScreen: React.FC<Store2PDVSalesScreenProps> = ({ operator, s
     }).format(price);
   };
 
-  const handleProductClick = (product: any) => {
+  const handleProductClick = (product: PDVProduct) => {
     if (product.is_weighable) {
       setSelectedWeighableProduct(product);
       setShowWeightModal(true);
     } else {
       addItem(product, 1);
+      setShowCart(true);
     }
   };
 
@@ -77,6 +79,7 @@ const Store2PDVSalesScreen: React.FC<Store2PDVSalesScreenProps> = ({ operator, s
     if (selectedWeighableProduct && weightInGrams > 0) {
       const weightInKg = weightInGrams / 1000;
       addItem(selectedWeighableProduct, 1, weightInKg);
+      setShowCart(true);
     }
     setShowWeightModal(false);
     setSelectedWeighableProduct(null);
@@ -84,6 +87,16 @@ const Store2PDVSalesScreen: React.FC<Store2PDVSalesScreenProps> = ({ operator, s
 
   const handleFinalizeSale = async () => {
     if (!currentRegister || items.length === 0) return;
+
+    if (!isCashRegisterOpen) {
+      alert('Não é possível realizar vendas sem um caixa aberto');
+      return;
+    }
+
+    if (!isCashRegisterOpen) {
+      alert('Não é possível realizar vendas sem um caixa aberto');
+      return;
+    }
 
     try {
       const saleData = {
@@ -98,7 +111,9 @@ const Store2PDVSalesScreen: React.FC<Store2PDVSalesScreenProps> = ({ operator, s
         change_amount: paymentInfo.changeFor || 0,
         notes: '',
         is_cancelled: false,
-        channel: 'loja2'
+        channel: 'pdv',
+        cash_register_id: currentRegister.id
+        cash_register_id: currentRegister.id
       };
 
       const saleItems = items.map(item => ({
@@ -113,10 +128,34 @@ const Store2PDVSalesScreen: React.FC<Store2PDVSalesScreenProps> = ({ operator, s
         subtotal: item.subtotal
       }));
 
-      await createSale(saleData, saleItems, currentRegister.id);
+      await createSale(saleData, saleItems);
       clearCart();
+      
+      // Mostrar feedback de sucesso
+      const successMessage = document.createElement('div');
+      successMessage.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center gap-2';
+      successMessage.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center gap-2';
+      successMessage.innerHTML = `
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+        </svg>
+        Venda realizada com sucesso - Loja 2!
+      `;
+      document.body.appendChild(successMessage);
+      
+      // Mostrar feedback de sucesso
+      const successMessage = document.createElement('div');
+      successMessage.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center gap-2';
+      successMessage.innerHTML = `
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+        </svg>
+        Venda realizada com sucesso!
+      `;
+      document.body.appendChild(successMessage);
+      setShowCart(false);
     } catch (error) {
-      console.error('Erro ao finalizar venda da Loja 2:', error);
+      console.error('Erro ao finalizar venda:', error);
       alert('Erro ao finalizar venda. Tente novamente.');
     }
   };
@@ -124,8 +163,8 @@ const Store2PDVSalesScreen: React.FC<Store2PDVSalesScreenProps> = ({ operator, s
   if (productsLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        <span className="ml-2 text-gray-600">Carregando produtos da Loja 2...</span>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+        <span className="ml-2 text-gray-600">Carregando produtos...</span>
       </div>
     );
   }
@@ -142,8 +181,8 @@ const Store2PDVSalesScreen: React.FC<Store2PDVSalesScreenProps> = ({ operator, s
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Buscar produtos da Loja 2..."
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Buscar produtos..."
+              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
             />
           </div>
 
@@ -154,7 +193,7 @@ const Store2PDVSalesScreen: React.FC<Store2PDVSalesScreenProps> = ({ operator, s
                 onClick={() => setSelectedCategory(cat.id)}
                 className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                   selectedCategory === cat.id
-                    ? 'bg-blue-600 text-white'
+                    ? 'bg-green-600 text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
@@ -170,7 +209,7 @@ const Store2PDVSalesScreen: React.FC<Store2PDVSalesScreenProps> = ({ operator, s
             <div
               key={product.id}
               onClick={() => handleProductClick(product)}
-              className="bg-gray-50 rounded-lg p-4 cursor-pointer hover:bg-gray-100 transition-colors border-2 border-transparent hover:border-blue-300"
+              className="bg-gray-50 rounded-lg p-4 cursor-pointer hover:bg-gray-100 transition-colors border-2 border-transparent hover:border-green-300"
             >
               <div className="aspect-square bg-gray-200 rounded-lg mb-3 flex items-center justify-center">
                 {product.image_url ? (
@@ -191,18 +230,18 @@ const Store2PDVSalesScreen: React.FC<Store2PDVSalesScreenProps> = ({ operator, s
               <div className="flex items-center justify-between">
                 <div>
                   {product.is_weighable ? (
-                    <div className="flex items-center gap-1 text-blue-600 font-bold text-sm">
+                    <div className="flex items-center gap-1 text-green-600 font-bold text-sm">
                       <Scale size={12} />
                       {formatPrice((product.price_per_gram || 0) * 1000)}/kg
                     </div>
                   ) : (
-                    <div className="font-bold text-blue-600 text-sm">
+                    <div className="font-bold text-green-600 text-sm">
                       {formatPrice(product.unit_price || 0)}
                     </div>
                   )}
                 </div>
                 
-                <button className="bg-blue-500 hover:bg-blue-600 text-white p-2 rounded-full">
+                <button className="bg-green-500 hover:bg-green-600 text-white p-2 rounded-full">
                   <Plus size={16} />
                 </button>
               </div>
@@ -213,7 +252,7 @@ const Store2PDVSalesScreen: React.FC<Store2PDVSalesScreenProps> = ({ operator, s
         {filteredProducts.length === 0 && (
           <div className="text-center py-12">
             <Package size={48} className="mx-auto text-gray-300 mb-4" />
-            <p className="text-gray-500">Nenhum produto encontrado na Loja 2</p>
+            <p className="text-gray-500">Nenhum produto encontrado</p>
           </div>
         )}
       </div>
@@ -222,10 +261,10 @@ const Store2PDVSalesScreen: React.FC<Store2PDVSalesScreenProps> = ({ operator, s
       <div className="w-96 bg-white rounded-xl shadow-sm p-6">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-            <ShoppingCart size={24} className="text-blue-600" />
-            Carrinho - Loja 2
+            <ShoppingCart size={24} className="text-green-600" />
+            Carrinho
           </h2>
-          <div className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
+          <div className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
             {totalItems} {totalItems === 1 ? 'item' : 'itens'}
           </div>
         </div>
@@ -271,7 +310,7 @@ const Store2PDVSalesScreen: React.FC<Store2PDVSalesScreenProps> = ({ operator, s
                       <Plus size={14} />
                     </button>
                   </div>
-                  <div className="font-bold text-blue-600">
+                  <div className="font-bold text-green-600">
                     {formatPrice(item.subtotal)}
                   </div>
                 </div>
@@ -296,7 +335,7 @@ const Store2PDVSalesScreen: React.FC<Store2PDVSalesScreenProps> = ({ operator, s
               )}
               <div className="flex justify-between font-bold text-lg">
                 <span>Total:</span>
-                <span className="text-blue-600">{formatPrice(getTotal())}</span>
+                <span className="text-green-600">{formatPrice(getTotal())}</span>
               </div>
             </div>
 
@@ -309,7 +348,7 @@ const Store2PDVSalesScreen: React.FC<Store2PDVSalesScreenProps> = ({ operator, s
                 <select
                   value={paymentInfo.method}
                   onChange={(e) => updatePaymentInfo({ method: e.target.value as any })}
-                  className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                 >
                   <option value="dinheiro">Dinheiro</option>
                   <option value="pix">PIX</option>
@@ -328,7 +367,7 @@ const Store2PDVSalesScreen: React.FC<Store2PDVSalesScreenProps> = ({ operator, s
                     step="0.01"
                     value={paymentInfo.changeFor || ''}
                     onChange={(e) => updatePaymentInfo({ changeFor: parseFloat(e.target.value) || undefined })}
-                    className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                     placeholder="Valor para troco"
                   />
                 </div>
@@ -337,14 +376,14 @@ const Store2PDVSalesScreen: React.FC<Store2PDVSalesScreenProps> = ({ operator, s
               <button
                 onClick={handleFinalizeSale}
                 disabled={!isCashRegisterOpen || salesLoading}
-                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white py-3 rounded-lg font-semibold transition-colors"
+                className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white py-3 rounded-lg font-semibold transition-colors"
               >
                 {salesLoading ? 'Processando...' : 'Finalizar Venda'}
               </button>
 
               {!isCashRegisterOpen && (
                 <p className="text-red-600 text-sm text-center">
-                  Abra o caixa para realizar vendas - Loja 2
+                  Abra o caixa para realizar vendas
                 </p>
               )}
             </div>
@@ -368,4 +407,4 @@ const Store2PDVSalesScreen: React.FC<Store2PDVSalesScreenProps> = ({ operator, s
   );
 };
 
-export default Store2PDVSalesScreen;
+export default PDVSalesScreen;
