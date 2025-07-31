@@ -16,7 +16,9 @@ import {
   AlertCircle,
   Calculator,
   CreditCard,
-  RefreshCw
+  RefreshCw,
+  ShoppingCart,
+  Scale
 } from 'lucide-react';
 import { RestaurantTable, TableSale, TableSaleItem, TableCartItem } from '../../types/table-sales';
 
@@ -40,6 +42,13 @@ const TableSalesPanel: React.FC<TableSalesPanelProps> = ({ storeId, operatorName
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [supabaseConfigured, setSupabaseConfigured] = useState(true);
+  const [availableProducts, setAvailableProducts] = useState<any[]>([]);
+  const [productSearchTerm, setProductSearchTerm] = useState('');
+  const [selectedProduct, setSelectedProduct] = useState<any>(null);
+  const [productQuantity, setProductQuantity] = useState(1);
+  const [productWeight, setProductWeight] = useState(0);
+  const [productNotes, setProductNotes] = useState('');
+  const [saleItems, setSaleItems] = useState<TableSaleItem[]>([]);
 
   // Check Supabase configuration
   useEffect(() => {
@@ -57,12 +66,85 @@ const TableSalesPanel: React.FC<TableSalesPanelProps> = ({ storeId, operatorName
   const tableName = storeId === 1 ? 'store1_tables' : 'store2_tables';
   const salesTableName = storeId === 1 ? 'store1_table_sales' : 'store2_table_sales';
   const itemsTableName = storeId === 1 ? 'store1_table_sale_items' : 'store2_table_sale_items';
+  const productsTableName = storeId === 1 ? 'pdv_products' : 'store2_products';
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL'
     }).format(price);
+  };
+
+  const fetchProducts = async () => {
+    try {
+      if (!supabaseConfigured) {
+        // Produtos de demonstração
+        const demoProducts = [
+          {
+            id: `demo-acai-300-loja${storeId}`,
+            code: `ACAI300L${storeId}`,
+            name: `Açaí 300ml - Loja ${storeId}`,
+            is_weighable: false,
+            unit_price: 15.90,
+            price_per_gram: null,
+            is_active: true
+          },
+          {
+            id: `demo-acai-500-loja${storeId}`,
+            code: `ACAI500L${storeId}`,
+            name: `Açaí 500ml - Loja ${storeId}`,
+            is_weighable: false,
+            unit_price: 22.90,
+            price_per_gram: null,
+            is_active: true
+          },
+          {
+            id: `demo-acai-1kg-loja${storeId}`,
+            code: `ACAI1KGL${storeId}`,
+            name: `Açaí 1kg - Loja ${storeId}`,
+            is_weighable: true,
+            unit_price: null,
+            price_per_gram: 0.04499,
+            is_active: true
+          }
+        ];
+        setAvailableProducts(demoProducts);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from(productsTableName)
+        .select('*')
+        .eq('is_active', true)
+        .order('name');
+
+      if (error) throw error;
+      setAvailableProducts(data || []);
+    } catch (err) {
+      console.error(`Erro ao carregar produtos da Loja ${storeId}:`, err);
+      setAvailableProducts([]);
+    }
+  };
+
+  const fetchSaleItems = async (saleId: string) => {
+    try {
+      if (!supabaseConfigured) {
+        setSaleItems([]);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from(itemsTableName)
+        .select('*')
+        .eq('sale_id', saleId)
+        .order('created_at');
+
+      if (error) throw error;
+      setSaleItems(data || []);
+    } catch (err) {
+      console.error('Erro ao carregar itens da venda:', err);
+      setSaleItems([]);
+    }
   };
 
   const fetchTables = async () => {
@@ -215,6 +297,11 @@ const TableSalesPanel: React.FC<TableSalesPanelProps> = ({ storeId, operatorName
 
   const addItemToSale = async (saleId: string, item: TableCartItem) => {
     try {
+      if (!supabaseConfigured) {
+        alert('Funcionalidade não disponível - Supabase não configurado');
+        return;
+      }
+
       const { error } = await supabase
         .from(itemsTableName)
         .insert([{
@@ -232,9 +319,19 @@ const TableSalesPanel: React.FC<TableSalesPanelProps> = ({ storeId, operatorName
 
       if (error) throw error;
 
-      // Atualizar totais da venda
-      const newSubtotal = cartItems.reduce((sum, cartItem) => sum + cartItem.subtotal, 0);
+      // Recarregar itens da venda
+      await fetchSaleItems(saleId);
       
+      // Calcular novo subtotal
+      const { data: items, error: itemsError } = await supabase
+        .from(itemsTableName)
+        .select('subtotal')
+        .eq('sale_id', saleId);
+
+      if (itemsError) throw itemsError;
+
+      const newSubtotal = items?.reduce((sum, item) => sum + item.subtotal, 0) || 0;
+
       await supabase
         .from(salesTableName)
         .update({
@@ -250,6 +347,78 @@ const TableSalesPanel: React.FC<TableSalesPanelProps> = ({ storeId, operatorName
     }
   };
 
+  const addProductToCart = () => {
+    if (!selectedProduct) return;
+
+    let subtotal = 0;
+    if (selectedProduct.is_weighable && productWeight > 0) {
+      subtotal = productWeight * (selectedProduct.price_per_gram || 0) * 1000; // peso em kg * preço por grama * 1000
+    } else if (!selectedProduct.is_weighable) {
+      subtotal = productQuantity * (selectedProduct.unit_price || 0);
+    }
+
+    const newItem: TableCartItem = {
+      product_code: selectedProduct.code,
+      product_name: selectedProduct.name,
+      quantity: productQuantity,
+      weight: selectedProduct.is_weighable ? productWeight : undefined,
+      unit_price: selectedProduct.is_weighable ? undefined : selectedProduct.unit_price,
+      price_per_gram: selectedProduct.is_weighable ? selectedProduct.price_per_gram : undefined,
+      subtotal: subtotal,
+      notes: productNotes
+    };
+
+    setCartItems(prev => [...prev, newItem]);
+    
+    // Reset form
+    setSelectedProduct(null);
+    setProductQuantity(1);
+    setProductWeight(0);
+    setProductNotes('');
+    setProductSearchTerm('');
+  };
+
+  const removeFromCart = (index: number) => {
+    setCartItems(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const saveCartItems = async () => {
+    if (!selectedTable?.current_sale || cartItems.length === 0) return;
+
+    try {
+      setSaving(true);
+      
+      for (const item of cartItems) {
+        await addItemToSale(selectedTable.current_sale.id, item);
+      }
+      
+      setCartItems([]);
+      await fetchSaleItems(selectedTable.current_sale.id);
+      
+      // Mostrar feedback de sucesso
+      const successMessage = document.createElement('div');
+      successMessage.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center gap-2';
+      successMessage.innerHTML = `
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+        </svg>
+        Itens adicionados à venda com sucesso!
+      `;
+      document.body.appendChild(successMessage);
+      
+      setTimeout(() => {
+        if (document.body.contains(successMessage)) {
+          document.body.removeChild(successMessage);
+        }
+      }, 3000);
+    } catch (err) {
+      console.error('Erro ao salvar itens:', err);
+      alert('Erro ao adicionar itens à venda');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const resetForm = () => {
     setCustomerName('');
     setCustomerCount(1);
@@ -257,17 +426,25 @@ const TableSalesPanel: React.FC<TableSalesPanelProps> = ({ storeId, operatorName
     setChangeAmount(0);
     setNotes('');
     setCartItems([]);
+    setSaleItems([]);
     setSelectedTable(null);
+    setSelectedProduct(null);
+    setProductQuantity(1);
+    setProductWeight(0);
+    setProductNotes('');
+    setProductSearchTerm('');
   };
 
   const handleOpenSaleModal = (table: RestaurantTable) => {
     setSelectedTable(table);
     setShowSaleModal(true);
+    fetchProducts();
     
     if (table.current_sale) {
       setCustomerName(table.current_sale.customer_name || '');
       setCustomerCount(table.current_sale.customer_count || 1);
       setNotes(table.current_sale.notes || '');
+      fetchSaleItems(table.current_sale.id);
     }
   };
 
@@ -309,6 +486,21 @@ const TableSalesPanel: React.FC<TableSalesPanelProps> = ({ storeId, operatorName
   useEffect(() => {
     fetchTables();
   }, [storeId]);
+
+  const filteredProducts = availableProducts.filter(product =>
+    product.name.toLowerCase().includes(productSearchTerm.toLowerCase()) ||
+    product.code.toLowerCase().includes(productSearchTerm.toLowerCase())
+  );
+
+  const getCartTotal = () => {
+    return cartItems.reduce((sum, item) => sum + item.subtotal, 0);
+  };
+
+  const getSaleTotal = () => {
+    const itemsTotal = saleItems.reduce((sum, item) => sum + item.subtotal, 0);
+    const cartTotal = getCartTotal();
+    return itemsTotal + cartTotal;
+  };
 
   if (loading) {
     return (
@@ -592,6 +784,221 @@ const TableSalesPanel: React.FC<TableSalesPanelProps> = ({ storeId, operatorName
                   </div>
                 </div>
 
+                {/* Produtos - Apenas para vendas ativas */}
+                {selectedTable.current_sale && (
+                  <div className="space-y-4">
+                    <h3 className="font-medium text-gray-800 flex items-center gap-2">
+                      <ShoppingCart size={20} className="text-green-600" />
+                      Produtos
+                    </h3>
+                    
+                    {/* Buscar Produtos */}
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <div className="relative mb-3">
+                        <Search size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                        <input
+                          type="text"
+                          value={productSearchTerm}
+                          onChange={(e) => setProductSearchTerm(e.target.value)}
+                          placeholder="Buscar produtos..."
+                          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                        />
+                      </div>
+                      
+                      {productSearchTerm && filteredProducts.length > 0 && (
+                        <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg mb-3">
+                          {filteredProducts.slice(0, 5).map(product => (
+                            <div 
+                              key={product.id}
+                              className="p-2 hover:bg-gray-100 cursor-pointer border-b border-gray-200 last:border-b-0"
+                              onClick={() => {
+                                setSelectedProduct(product);
+                                setProductSearchTerm('');
+                              }}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <div className="font-medium text-sm">{product.name}</div>
+                                  <div className="text-xs text-gray-500">{product.code}</div>
+                                </div>
+                                <div className="text-sm font-medium text-green-600">
+                                  {product.is_weighable ? 
+                                    `${formatPrice((product.price_per_gram || 0) * 1000)}/kg` :
+                                    formatPrice(product.unit_price || 0)
+                                  }
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {selectedProduct && (
+                        <div className="bg-white p-3 rounded-lg border border-gray-200 mb-3">
+                          <div className="flex justify-between items-start mb-2">
+                            <div className="flex-1">
+                              <div className="font-medium text-gray-800">{selectedProduct.name}</div>
+                              <div className="text-sm text-gray-500">{selectedProduct.code}</div>
+                              <div className="text-sm font-medium text-green-600">
+                                {selectedProduct.is_weighable ? 
+                                  `${formatPrice((selectedProduct.price_per_gram || 0) * 1000)}/kg` :
+                                  formatPrice(selectedProduct.unit_price || 0)
+                                }
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => setSelectedProduct(null)}
+                              className="text-gray-400 hover:text-gray-600"
+                            >
+                              <X size={16} />
+                            </button>
+                          </div>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {selectedProduct.is_weighable ? (
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                  Peso (kg)
+                                </label>
+                                <div className="relative">
+                                  <Scale size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                                  <input
+                                    type="number"
+                                    step="0.001"
+                                    min="0"
+                                    value={productWeight}
+                                    onChange={(e) => setProductWeight(parseFloat(e.target.value) || 0)}
+                                    className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                                    placeholder="0.000"
+                                  />
+                                </div>
+                              </div>
+                            ) : (
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                  Quantidade
+                                </label>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  value={productQuantity}
+                                  onChange={(e) => setProductQuantity(parseInt(e.target.value) || 1)}
+                                  className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                                />
+                              </div>
+                            )}
+                            
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Observações
+                              </label>
+                              <input
+                                type="text"
+                                value={productNotes}
+                                onChange={(e) => setProductNotes(e.target.value)}
+                                className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                                placeholder="Observações do item"
+                              />
+                            </div>
+                          </div>
+                          
+                          <div className="mt-3 flex justify-between items-center">
+                            <div className="text-sm text-gray-600">
+                              Subtotal: <span className="font-bold text-green-600">
+                                {formatPrice(
+                                  selectedProduct.is_weighable ? 
+                                    productWeight * (selectedProduct.price_per_gram || 0) * 1000 :
+                                    productQuantity * (selectedProduct.unit_price || 0)
+                                )}
+                              </span>
+                            </div>
+                            <button
+                              onClick={addProductToCart}
+                              disabled={selectedProduct.is_weighable ? productWeight <= 0 : productQuantity <= 0}
+                              className="bg-green-500 hover:bg-green-600 disabled:bg-gray-300 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+                            >
+                              Adicionar
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Carrinho de Produtos */}
+                    {cartItems.length > 0 && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <h4 className="font-medium text-blue-800 mb-3">Itens a Adicionar ({cartItems.length})</h4>
+                        <div className="space-y-2 max-h-32 overflow-y-auto">
+                          {cartItems.map((item, index) => (
+                            <div key={index} className="bg-white p-2 rounded border flex justify-between items-center">
+                              <div className="flex-1">
+                                <div className="font-medium text-sm">{item.product_name}</div>
+                                <div className="text-xs text-gray-500">
+                                  {item.weight ? `${item.weight}kg` : `${item.quantity}x`}
+                                  {item.notes && ` - ${item.notes}`}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-green-600 text-sm">
+                                  {formatPrice(item.subtotal)}
+                                </span>
+                                <button
+                                  onClick={() => removeFromCart(index)}
+                                  className="text-red-500 hover:text-red-700"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="mt-3 pt-3 border-t border-blue-200 flex justify-between items-center">
+                          <span className="font-medium text-blue-800">Total do Carrinho:</span>
+                          <span className="font-bold text-blue-800">{formatPrice(getCartTotal())}</span>
+                        </div>
+                        <button
+                          onClick={saveCartItems}
+                          disabled={saving}
+                          className="w-full mt-3 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 text-white py-2 rounded-lg font-medium transition-colors"
+                        >
+                          {saving ? 'Salvando...' : 'Salvar Itens na Venda'}
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Itens da Venda Atual */}
+                    {saleItems.length > 0 && (
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                        <h4 className="font-medium text-green-800 mb-3">Itens da Venda ({saleItems.length})</h4>
+                        <div className="space-y-2 max-h-40 overflow-y-auto">
+                          {saleItems.map((item) => (
+                            <div key={item.id} className="bg-white p-2 rounded border">
+                              <div className="flex justify-between items-center">
+                                <div className="flex-1">
+                                  <div className="font-medium text-sm">{item.product_name}</div>
+                                  <div className="text-xs text-gray-500">
+                                    {item.weight_kg ? `${item.weight_kg}kg` : `${item.quantity}x`}
+                                    {item.notes && ` - ${item.notes}`}
+                                  </div>
+                                </div>
+                                <span className="font-bold text-green-600 text-sm">
+                                  {formatPrice(item.subtotal)}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="mt-3 pt-3 border-t border-green-200 flex justify-between items-center">
+                          <span className="font-medium text-green-800">Total dos Itens:</span>
+                          <span className="font-bold text-green-800">
+                            {formatPrice(saleItems.reduce((sum, item) => sum + item.subtotal, 0))}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Forma de Pagamento (apenas para fechar conta) */}
                 {selectedTable.current_sale && (
                   <div className="space-y-4">
@@ -637,8 +1044,18 @@ const TableSalesPanel: React.FC<TableSalesPanelProps> = ({ storeId, operatorName
                       <h4 className="font-medium text-green-800 mb-2">Resumo da Venda</h4>
                       <div className="space-y-2 text-sm">
                         <div className="flex justify-between">
+                          <span className="text-green-600">Itens salvos:</span>
+                          <span className="font-medium">{formatPrice(saleItems.reduce((sum, item) => sum + item.subtotal, 0))}</span>
+                        </div>
+                        {cartItems.length > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-blue-600">Itens no carrinho:</span>
+                            <span className="font-medium text-blue-600">{formatPrice(getCartTotal())}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between">
                           <span className="text-green-600">Subtotal:</span>
-                          <span className="font-medium">{formatPrice(selectedTable.current_sale.subtotal)}</span>
+                          <span className="font-medium">{formatPrice(getSaleTotal())}</span>
                         </div>
                         {selectedTable.current_sale.discount_amount > 0 && (
                           <div className="flex justify-between">
@@ -648,7 +1065,7 @@ const TableSalesPanel: React.FC<TableSalesPanelProps> = ({ storeId, operatorName
                         )}
                         <div className="flex justify-between font-bold text-lg pt-2 border-t border-green-200">
                           <span className="text-green-800">Total:</span>
-                          <span className="text-green-800">{formatPrice(selectedTable.current_sale.total_amount)}</span>
+                          <span className="text-green-800">{formatPrice(getSaleTotal() - selectedTable.current_sale.discount_amount)}</span>
                         </div>
                       </div>
                     </div>
