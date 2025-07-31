@@ -113,7 +113,7 @@ const PDVSalesScreen: React.FC<PDVSalesScreenProps> = ({ operator, scaleHook, st
         is_cancelled: false,
         channel: 'pdv',
         cash_register_id: currentRegister.id
-     
+        cash_register_id: currentRegister.id
       };
 
       const saleItems = items.map(item => ({
@@ -130,10 +130,6 @@ const PDVSalesScreen: React.FC<PDVSalesScreenProps> = ({ operator, scaleHook, st
 
       await createSale(saleData, saleItems);
       clearCart();
-      
-      // Mostrar feedback de sucesso
-      const successMessage = document.createElement('div');
-      successMessage.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center gap-2';
       
       // Mostrar feedback de sucesso
       const successMessage = document.createElement('div');
