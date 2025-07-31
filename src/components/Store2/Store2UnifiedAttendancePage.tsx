@@ -113,7 +113,7 @@ const PDVSalesScreen: React.FC<PDVSalesScreenProps> = ({ operator, scaleHook, st
         is_cancelled: false,
         channel: 'pdv',
         cash_register_id: currentRegister.id
-        cash_register_id: currentRegister.id
+        
       };
 
       const saleItems = items.map(item => ({
