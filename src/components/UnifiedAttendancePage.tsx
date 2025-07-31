@@ -392,10 +392,6 @@ const PDVSalesScreen: React.FC<PDVSalesScreenProps> = ({ operator, scaleHook, st
             setShowWeightModal(false);
             setSelectedWeighableProduct(null);
           }}
-            >
-              <Clock size={20} />
-              Histórico de Vendas
-            </button>
           useDirectScale={true}
         />
       )}
