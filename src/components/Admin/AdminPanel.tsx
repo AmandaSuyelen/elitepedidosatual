@@ -5,14 +5,13 @@ import NeighborhoodsPanel from './NeighborhoodsPanel';
 import StoreHoursPanel from './StoreHoursPanel';
 import UnifiedAttendancePage from '../UnifiedAttendancePage';
 import AttendanceUsersPanel from './AttendanceUsersPanel';
-import TableSalesPanel from '../TableSales/TableSalesPanel';
 
 interface AdminPanelProps {
   onLogout: () => void;
 }
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
-  const [activeTab, setActiveTab] = useState<'products' | 'neighborhoods' | 'hours' | 'pdv' | 'users' | 'mesas'>('products');
+  const [activeTab, setActiveTab] = useState<'products' | 'neighborhoods' | 'hours' | 'pdv' | 'users'>('products');
 
   const renderTabContent = () => {
     switch (activeTab) {
@@ -24,8 +23,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
         return <StoreHoursPanel />; 
       case 'pdv':
         return <UnifiedAttendancePage />;
-      case 'mesas':
-        return <TableSalesPanel storeId={1} />;
       case 'users':
         return <AttendanceUsersPanel />;
       default:
@@ -106,17 +103,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
             >
               <Settings size={20} />
               PDV
-            </button>
-            <button
-              onClick={() => setActiveTab('mesas')}
-              className={`px-6 py-3 rounded-lg font-medium transition-colors flex items-center gap-2 ${
-                activeTab === 'mesas'
-                  ? 'bg-indigo-600 text-white shadow-lg'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              <Users size={20} />
-              Mesas
             </button>
             <button
               onClick={() => setActiveTab('users')}

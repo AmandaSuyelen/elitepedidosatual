@@ -15,11 +15,10 @@ import {
 import Store2UsersManager from './Store2UsersManager';
 import Store2Settings from './Store2Settings';
 import Store2ProductsManager from './Store2ProductsManager';
-import TableSalesPanel from '../TableSales/TableSalesPanel';
 
 const Store2ManagementPage: React.FC = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'users' | 'products' | 'settings' | 'reports' | 'mesas'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'products' | 'settings' | 'reports'>('users');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -171,13 +170,6 @@ const Store2ManagementPage: React.FC = () => {
       description: 'Catálogo de produtos da Loja 2'
     },
     {
-      id: 'mesas' as const,
-      label: 'Mesas',
-      icon: Users,
-      color: 'bg-indigo-600',
-      description: 'Gerenciar mesas da Loja 2'
-    },
-    {
       id: 'settings' as const,
       label: 'Configurações',
       icon: Settings,
@@ -199,8 +191,6 @@ const Store2ManagementPage: React.FC = () => {
         return <Store2UsersManager />;
       case 'products':
         return <Store2ProductsManager />;
-      case 'mesas':
-        return <TableSalesPanel storeId={2} />;
       case 'settings':
         return <Store2Settings />;
       case 'reports':

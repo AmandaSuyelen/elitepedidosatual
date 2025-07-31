@@ -17,7 +17,6 @@ import PDVOperators from './PDVOperators';
 import PDVSalesReport from './PDVSalesReport';
 import CashRegisterMenu from './CashRegisterMenu';
 import AttendantPanel from '../Orders/AttendantPanel';
-import TableSalesPanel from '../TableSales/TableSalesPanel';
 
 // Define menu items before component to avoid initialization issues
 // Organize menu items by category
@@ -31,7 +30,6 @@ const menuCategories = [
       { id: 'cash_menu' as const, label: 'Caixas', icon: DollarSign, color: 'bg-yellow-500' },
       { id: 'products' as const, label: 'Produtos', icon: Package, color: 'bg-blue-500' },
       { id: 'orders' as const, label: 'Pedidos', icon: Truck, color: 'bg-purple-500' },
-      { id: 'mesas' as const, label: 'Mesas', icon: Users, color: 'bg-indigo-500' },
     ]
   },
   {
@@ -86,7 +84,7 @@ interface PDVMainProps {
 }
 
 const PDVMain: React.FC<PDVMainProps> = ({ onBack, operator }) => {
-  const [activeScreen, setActiveScreen] = useState<'attendance' | 'products' | 'reports' | 'settings' | 'operators' | 'cash_register' | 'sales_report' | 'cash_report' | 'orders' | 'cash_menu' | 'daily_cash_report' | 'cash_report_details' | 'delivery_report' | 'mesas'>('attendance');
+  const [activeScreen, setActiveScreen] = useState<'attendance' | 'products' | 'reports' | 'settings' | 'operators' | 'cash_register' | 'sales_report' | 'cash_report' | 'orders' | 'cash_menu' | 'daily_cash_report' | 'cash_report_details' | 'delivery_report'>('attendance');
   const { hasPermission } = usePermissions();
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
     main: true,
@@ -356,8 +354,6 @@ const PDVMain: React.FC<PDVMainProps> = ({ onBack, operator }) => {
         return <AttendantPanel />;
       case 'cash_menu':
         return <CashRegisterMenu />;
-      case 'mesas':
-        return <TableSalesPanel storeId={1} />;
       case 'sales_report':
         return <PDVSalesReport />;
       case 'cash_report':
