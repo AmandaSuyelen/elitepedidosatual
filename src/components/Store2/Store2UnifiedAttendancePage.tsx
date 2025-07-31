@@ -3,7 +3,7 @@ import { Plus, Search, Package, Scale, ShoppingCart, Calculator, User, DollarSig
 import { usePDVProducts, usePDVSales, usePDVCart } from '../../hooks/usePDV';
 import { usePDVCashRegister } from '../../hooks/usePDVCashRegister';
 import { PDVOperator, PDVProduct } from '../../types/pdv';
-import { PesagemModal } from '../PesagemModal';
+import { PesagemModal } from "../PDV/PesagemModal";
 
 interface PDVSalesScreenProps {
   operator?: PDVOperator;
